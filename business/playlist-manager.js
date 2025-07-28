@@ -91,51 +91,7 @@ class PlaylistManager {
             return [];
         }
 
-        console.log(`🎵 ${toExtract.length} playlists à extraire:`);
-        toExtract.forEach(p => console.log(`  - ${p.name} (${p.tracks_total} musiques)`));
-
-        // Créer le timestamp
-        const timestamp = this.generateTimestamp();
-        
-        // Créer le dossier de destination
-        const outputDir = 'data/extractions';
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true });
-        }
-
-        const extractedFiles = [];
-
-        // Extraire chaque playlist
-        for (const playlistMeta of toExtract) {
-            try {
-                console.log(`\n🎵 Extraction de "${playlistMeta.name}"...`);
-                
-                // Récupérer les tracks via l'API
-                const tracks = await this.playlistsApi.getPlaylistTracks(playlistMeta.id, playlistMeta.name);
-                
-                // Créer le nom de fichier
-                const safePlaylistName = this.sanitizeFilename(playlistMeta.name);
-                const filename = `${timestamp}_${safePlaylistName}.csv`;
-                const filepath = path.join(outputDir, filename);
-                
-                // Sauvegarder en CSV
-                this.saveTracksToCSV(tracks, playlistMeta, filepath);
-                
-                extractedFiles.push({
-                    playlist: playlistMeta.name,
-                    filename: filename,
-                    tracks_count: tracks.length
-                });
-                
-                console.log(`✅ "${playlistMeta.name}": ${tracks.length} musiques → ${filename}`);
-                
-            } catch (error) {
-                console.error(`❌ Erreur pour "${playlistMeta.name}": ${error.message}`);
-            }
-        }
-
-        console.log(`\n🎉 Extraction terminée - ${extractedFiles.length} fichiers créés dans ${outputDir}/`);
-        return extractedFiles;
+        return await this.extractPlaylists(toExtract);
     }
 
     /**
@@ -166,9 +122,146 @@ class PlaylistManager {
         return metadata;
     }
 
+    /**
+     * FONCTION BUSINESS 4: Extraire des playlists spécifiques
+     * Permet de ré-extraire certaines playlists par nom (partiel)
+     * @param {Array<string>} playlistNames - Noms (partiels) des playlists à extraire
+     */
+    async extractSpecificPlaylists(playlistNames) {
+        await this.initialize();
+        
+        console.log('🎯 Extraction de playlists spécifiques...');
+        
+        // Charger les métadonnées
+        const metadata = this.loadExistingMetadata();
+        const toExtract = metadata.filter(playlist => 
+            playlistNames.some(name => 
+                playlist.name.toLowerCase().includes(name.toLowerCase())
+            )
+        );
+        
+        if (toExtract.length === 0) {
+            console.log('❌ Aucune playlist trouvée avec ces noms:');
+            playlistNames.forEach(name => console.log(`  - "${name}"`));
+            console.log('\n📋 Playlists disponibles:');
+            metadata.forEach(p => console.log(`  - ${p.name}`));
+            return [];
+        }
+
+        console.log(`🎵 ${toExtract.length} playlists trouvées:`);
+        toExtract.forEach(p => console.log(`  - ${p.name} (${p.tracks_total} musiques)`));
+
+        return await this.extractPlaylists(toExtract);
+    }
+
+    /**
+     * FONCTION BUSINESS 4: Extraire une playlist par ID
+     * Méthode simple : passer l'ID et ça extrait
+     * @param {string} playlistId - ID de la playlist à extraire
+     */
+    async extractPlaylistById(playlistId) {
+        await this.initialize();
+        
+        console.log(`🎯 Extraction de la playlist ID: ${playlistId}`);
+        
+        // Charger les métadonnées pour récupérer le nom
+        const metadata = this.loadExistingMetadata();
+        const playlist = metadata.find(p => p.id === playlistId);
+        
+        if (!playlist) {
+            console.log(`❌ Playlist avec ID "${playlistId}" non trouvée`);
+            console.log('💡 Exécutez listPlaylists() pour voir les IDs disponibles');
+            return null;
+        }
+
+        console.log(`🎵 Extraction de "${playlist.name}"...`);
+
+        try {
+            // Récupérer les tracks via l'API
+            const tracks = await this.playlistsApi.getPlaylistTracks(playlistId, playlist.name);
+            
+            // Créer le timestamp et nom de fichier
+            const timestamp = this.generateTimestamp();
+            const safePlaylistName = this.sanitizeFilename(playlist.name);
+            const filename = `${timestamp}_${safePlaylistName}.csv`;
+            
+            // Créer le dossier de destination
+            const outputDir = 'data/extractions';
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+            
+            const filepath = path.join(outputDir, filename);
+            
+            // Sauvegarder en CSV
+            this.saveTracksToCSV(tracks, playlist, filepath);
+            
+            console.log(`✅ "${playlist.name}": ${tracks.length} musiques → ${filename}`);
+            
+            return {
+                playlist: playlist.name,
+                filename: filename,
+                tracks_count: tracks.length,
+                filepath: filepath
+            };
+            
+        } catch (error) {
+            console.error(`❌ Erreur pour "${playlist.name}": ${error.message}`);
+            return null;
+        }
+    }
+
     // =====================================
     // FONCTIONS UTILITAIRES INTERNES
     // =====================================
+
+    /**
+     * Extraire une liste de playlists (utilisé par extractMarkedPlaylists et extractSpecificPlaylists)
+     */
+    async extractPlaylists(playlistsToExtract) {
+        // Créer le timestamp
+        const timestamp = this.generateTimestamp();
+        
+        // Créer le dossier de destination
+        const outputDir = 'data/extractions';
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+
+        const extractedFiles = [];
+
+        // Extraire chaque playlist
+        for (const playlistMeta of playlistsToExtract) {
+            try {
+                console.log(`\n🎵 Extraction de "${playlistMeta.name}"...`);
+                
+                // Récupérer les tracks via l'API
+                const tracks = await this.playlistsApi.getPlaylistTracks(playlistMeta.id, playlistMeta.name);
+                
+                // Créer le nom de fichier
+                const safePlaylistName = this.sanitizeFilename(playlistMeta.name);
+                const filename = `${timestamp}_${safePlaylistName}.csv`;
+                const filepath = path.join(outputDir, filename);
+                
+                // Sauvegarder en CSV avec formatage corrigé
+                this.saveTracksToCSV(tracks, playlistMeta, filepath);
+                
+                extractedFiles.push({
+                    playlist: playlistMeta.name,
+                    filename: filename,
+                    tracks_count: tracks.length
+                });
+                
+                console.log(`✅ "${playlistMeta.name}": ${tracks.length} musiques → ${filename}`);
+                
+            } catch (error) {
+                console.error(`❌ Erreur pour "${playlistMeta.name}": ${error.message}`);
+            }
+        }
+
+        console.log(`\n🎉 Extraction terminée - ${extractedFiles.length} fichiers créés dans ${outputDir}/`);
+        return extractedFiles;
+    }
 
     /**
      * Charger les métadonnées existantes
@@ -200,50 +293,73 @@ class PlaylistManager {
     }
 
     /**
-     * Sauvegarder les tracks en CSV
+     * Sauvegarder les tracks en CSV (version simple avec point-virgule)
      */
     saveTracksToCSV(tracks, playlistInfo, filepath) {
-        // En-têtes CSV
+        // En-têtes CSV simples
         const headers = [
             'Position',
             'Titre',
             'Artistes',
             'Album',
-            'Date de sortie',
-            'Durée',
-            'Popularité',
+            'Date_sortie',
+            'Duree',
+            'Popularite',
             'Explicite',
-            'URL Spotify',
-            'ID Spotify'
+            'URL_Spotify',
+            'ID_Spotify'
         ];
 
-        // Convertir les tracks en lignes CSV
-        const csvRows = [
-            headers.join(','),
-            ...tracks.map(track => [
-                track.position,
-                `"${track.name.replace(/"/g, '""')}"`, // Échapper les guillemets
-                `"${track.artists.replace(/"/g, '""')}"`,
-                `"${track.album.replace(/"/g, '""')}"`,
-                track.release_date,
-                track.duration_formatted,
-                track.popularity,
-                track.explicit ? 'Oui' : 'Non',
-                track.external_urls,
-                track.spotify_id
-            ].join(','))
-        ];
+        // Fonction pour nettoyer simplement (enlever point-virgule pour éviter confusion)
+        const cleanField = (field) => {
+            if (field === null || field === undefined) {
+                return '';
+            }
+            
+            let stringField = String(field);
+            
+            // Nettoyer : enlever les point-virgules et caractères problématiques
+            stringField = stringField.replace(/[;"\n\r]/g, ' ');
+            
+            // Nettoyer les caractères spéciaux mais garder plus de choses
+            stringField = stringField.replace(/[^\w\s\-\.\:\/]/g, '');
+            
+            // Supprimer les espaces multiples
+            stringField = stringField.replace(/\s+/g, ' ').trim();
+            
+            return stringField;
+        };
 
-        // Ajouter un en-tête avec les infos de la playlist
-        const csvContent = [
-            `# Playlist: ${playlistInfo.name}`,
-            `# Total: ${tracks.length} musiques`,
-            `# Exporté le: ${new Date().toLocaleDateString('fr-FR')}`,
-            '',
-            ...csvRows
-        ].join('\n');
+        // Créer les lignes CSV avec point-virgule
+        const csvLines = [];
+        
+        // Ligne d'en-têtes
+        csvLines.push(headers.join(';'));
+        
+        // Lignes de données nettoyées
+        tracks.forEach(track => {
+            const row = [
+                cleanField(track.position),
+                cleanField(track.name),
+                cleanField(track.artists),
+                cleanField(track.album),
+                cleanField(track.release_date),
+                cleanField(track.duration_formatted),
+                cleanField(track.popularity),
+                cleanField(track.explicit ? 'Oui' : 'Non'),
+                cleanField(track.external_urls),
+                cleanField(track.spotify_id)
+            ];
+            csvLines.push(row.join(';'));
+        });
 
+        // Joindre toutes les lignes
+        const csvContent = csvLines.join('\n');
+
+        // Écrire le fichier simple
         fs.writeFileSync(filepath, csvContent, 'utf8');
+        
+        console.log(`📊 CSV généré avec ${tracks.length} lignes (délimiteur point-virgule, version simple)`);
     }
 
     /**

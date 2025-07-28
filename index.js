@@ -33,23 +33,43 @@ function listPlaylists() {
     return manager.listPlaylists();
 }
 
+async function extractPlaylistById(playlistId) {
+    console.log('🎯 === EXTRACTION PAR ID ===');
+    return await manager.extractPlaylistById(playlistId);
+}
+
 // ===================================
 // POINT D'ENTRÉE PRINCIPAL
 // ===================================
 
 async function main() {
-    console.log(`
+    const arg1 = process.argv[2];
+    
+    // Si pas d'argument ou argument classique
+    if (!arg1) {
+        console.log(`
 🎵 SPOTIFY PLAYLIST MANAGER 🎵
 
-Actions disponibles:
-- sync    → Synchroniser toutes les playlists
-- list    → Afficher les playlists avec statut
-- extract → Extraire les playlists marquées
-    `);
+Usage simple:
+  node index.js sync                    → Synchroniser
+  node index.js list                    → Lister avec IDs  
+  node index.js extract                 → Extraire marquées
+  node index.js [PLAYLIST_ID]           → Extraire par ID
 
-    const action = process.argv[2] || 'sync';
+Exemple:
+  node index.js 5hAQMFDL6ozHE1cXdt8ycJ
+        `);
+        return;
+    }
     
-    switch(action) {
+    // Si c'est un ID de playlist (chaîne longue)
+    if (arg1.length > 10 && !['sync', 'list', 'extract'].includes(arg1)) {
+        await extractPlaylistById(arg1);
+        return;
+    }
+    
+    // Actions standard
+    switch(arg1) {
         case 'sync':
             await syncPlaylists();
             break;
@@ -60,7 +80,8 @@ Actions disponibles:
             await extractPlaylists();
             break;
         default:
-            console.log('📖 Usage: node index.js [sync|list|extract]');
+            console.log('❌ Action non reconnue');
+            console.log('📖 Usage: node index.js [sync|list|extract|PLAYLIST_ID]');
     }
 }
 
@@ -69,7 +90,8 @@ module.exports = {
     manager,
     syncPlaylists,
     extractPlaylists,
-    listPlaylists
+    listPlaylists,
+    extractPlaylistById
 };
 
 // Exécuter si lancé directement

@@ -56,3 +56,18 @@ manager.listPlaylists();
 // 3. Extraire les marquées 
 await manager.extractMarkedPlaylists();
 ```
+
+
+🎵 SPOTIFY PLAYLIST MANAGER 🎵
+
+Usage simple:
+  node index.js sync                    → Synchroniser
+  node index.js list                    → Lister avec IDs  
+  node index.js extract                 → Extraire marquées
+  node index.js [PLAYLIST_ID]           → Extraire par ID
+
+Exemple:
+  node index.js 5hAQMFDL6ozHE1cXdt8ycJ
+        `);
+        return;
+    }
