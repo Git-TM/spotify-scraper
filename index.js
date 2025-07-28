@@ -43,45 +43,30 @@ async function extractPlaylistById(playlistId) {
 // ===================================
 
 async function main() {
-    const arg1 = process.argv[2];
+    const action = process.argv[2];
+    const playlistId = process.argv[3];
     
-    // Si pas d'argument ou argument classique
-    if (!arg1) {
-        console.log(`
-🎵 SPOTIFY PLAYLIST MANAGER 🎵
-
-Usage simple:
-  node index.js sync                    → Synchroniser
-  node index.js list                    → Lister avec IDs  
-  node index.js extract                 → Extraire marquées
-  node index.js [PLAYLIST_ID]           → Extraire par ID
-
-Exemple:
-  node index.js 5hAQMFDL6ozHE1cXdt8ycJ
-        `);
-        return;
-    }
-    
-    // Si c'est un ID de playlist (chaîne longue)
-    if (arg1.length > 10 && !['sync', 'list', 'extract'].includes(arg1)) {
-        await extractPlaylistById(arg1);
-        return;
-    }
-    
-    // Actions standard
-    switch(arg1) {
+    // Routage simple
+    switch(action) {
         case 'sync':
             await syncPlaylists();
             break;
+            
         case 'list':
             listPlaylists();
             break;
+            
         case 'extract':
-            await extractPlaylists();
+            if (playlistId) {
+                await extractPlaylistById(playlistId);
+            } else {
+                await extractPlaylists();
+            }
             break;
+            
         default:
-            console.log('❌ Action non reconnue');
-            console.log('📖 Usage: node index.js [sync|list|extract|PLAYLIST_ID]');
+            console.log('❌ Commande inconnue');
+            break;
     }
 }
 
